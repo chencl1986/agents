@@ -1,0 +1,21 @@
+# Environment and local secrets
+.env
+.env.*
+*.local.*
+
+# Real runtime config (keep only *.example in repo)
+configs/**/config.toml
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
