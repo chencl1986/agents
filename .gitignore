@@ -1,7 +1,8 @@
 # Environment and local secrets
 .env
-.env.*
-*.local.*
+.env.local
+.env.*.local
+!.env.example
 
 # Real runtime config (keep only *.example in repo)
 configs/**/config.toml
