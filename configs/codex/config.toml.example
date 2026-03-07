@@ -9,12 +9,10 @@
 # Copy this file to a real config path and replace the placeholder values locally.
 
 # Example MCP server using STDIO transport.
-# Rename "example_stdio" to your server name when creating a real config.
 [mcp_servers.example_stdio]
-transport = "stdio"
-command = "/path/to/your/mcp-server"
-args = ["--config", "/path/to/local/config"]
+command = "python"
+args = ["mcp/intranet-docs/server.py"]
 
 # Optional placeholders you may add locally when needed:
+# cwd = "/path/to/your/repo"
 # env = { EXAMPLE_TOKEN = "replace-me" }
-# cwd = "/path/to/working/directory"
