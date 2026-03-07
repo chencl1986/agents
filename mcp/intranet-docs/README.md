@@ -32,7 +32,7 @@ mcp/intranet-docs/
 - `url`：要读取的本地文档 URL，支持分类页 URL 和带 `#...` 的 hash 路由 URL
 - `timeout_sec`：HTTP 请求超时时间，默认 `15`
 - `max_chars`：最大返回字符数，默认 `20000`
-- `output_format`：输出格式，支持 `markdown` 和 `text`
+- `output_format`：输出格式，支持 `markdown` 和 `text`。其中 `markdown` 返回更适合模型阅读的 Markdown 风格文本，不保证为严格 Markdown
 
 输出内容说明：
 - 返回带元信息头部的字符串
@@ -53,6 +53,7 @@ export INTRANET_ALLOWED_PREFIXES="http://127.0.0.1:8000/,http://localhost:8000/"
 
 实现约束：
 - 会先对 URL 执行 allowlist 校验
+- 当前 allowlist 采用基于 URL 前缀匹配的轻量校验
 - 对带 hash 的 URL，会拆分为“基础页面 URL + hash 路由片段”
 - 实际 HTTP 请求只抓取基础页面
 - 输出中会保留 `hash_fragment`，并尽量提取与该片段相关的内容

@@ -245,6 +245,7 @@ def fetch_document(
     timeout = httpx.Timeout(timeout_sec)
     with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         response = client.get(base_url)
+        response.raise_for_status()
 
     content_type = normalize_content_type(response.headers.get("content-type", ""))
     if content_type == "text/html":
