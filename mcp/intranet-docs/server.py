@@ -211,6 +211,95 @@ def format_schema_type(schema: Any) -> str:
     return "object"
 
 
+def resolve_schema_ref(schema: Any, spec: dict[str, Any] | None) -> Any:
+    """Resolve local OpenAPI schema refs when possible."""
+
+    if not isinstance(schema, dict):
+        return schema
+
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/") or not isinstance(spec, dict):
+        return schema
+
+    target: Any = spec
+    for part in ref.removeprefix("#/").split("/"):
+        if not isinstance(target, dict):
+            return schema
+        target = target.get(part)
+        if target is None:
+            return schema
+
+    return target if isinstance(target, dict) else schema
+
+
+def format_schema_details(
+    schema: Any,
+    spec: dict[str, Any] | None,
+    indent: int = 0,
+    seen_refs: set[str] | None = None,
+) -> list[str]:
+    """Render schema fields recursively for object-like request/response bodies."""
+
+    if seen_refs is None:
+        seen_refs = set()
+
+    if not isinstance(schema, dict):
+        return []
+
+    ref = schema.get("$ref")
+    if isinstance(ref, str) and ref:
+        if ref in seen_refs:
+            return []
+        seen_refs = seen_refs | {ref}
+        schema = resolve_schema_ref(schema, spec)
+
+    merged_properties: dict[str, Any] = {}
+    required: set[str] = set()
+
+    schema_type = schema.get("type")
+    if schema_type == "array":
+        item_schema = schema.get("items", {})
+        prefix = "  " * indent
+        lines = [f"{prefix}- items `{format_schema_type(item_schema)}`"]
+        lines.extend(format_schema_details(item_schema, spec, indent + 1, seen_refs))
+        return lines
+
+    if isinstance(schema.get("properties"), dict):
+        merged_properties.update(schema["properties"])
+    if isinstance(schema.get("required"), list):
+        required.update(str(item) for item in schema["required"])
+
+    for key in ("allOf", "oneOf", "anyOf"):
+        variants = schema.get(key)
+        if not isinstance(variants, list):
+            continue
+        for variant in variants:
+            if not isinstance(variant, dict):
+                continue
+            resolved_variant = resolve_schema_ref(variant, spec)
+            if isinstance(resolved_variant.get("properties"), dict):
+                merged_properties.update(resolved_variant["properties"])
+            if isinstance(resolved_variant.get("required"), list):
+                required.update(str(item) for item in resolved_variant["required"])
+
+    if not merged_properties:
+        return []
+
+    lines: list[str] = []
+    prefix = "  " * indent
+    for name, prop_schema in merged_properties.items():
+        prop_schema = resolve_schema_ref(prop_schema, spec)
+        prop_type = format_schema_type(prop_schema)
+        is_required = " required" if name in required else ""
+        description = clean_text(str(prop_schema.get("description", "")))
+        lines.append(f"{prefix}- `{name}` `{prop_type}`{is_required}")
+        if description:
+            lines.append(f"{prefix}  {description}")
+        lines.extend(format_schema_details(prop_schema, spec, indent + 1, seen_refs))
+
+    return lines
+
+
 def format_parameter_lines(parameters: list[dict[str, Any]]) -> list[str]:
     """Render OpenAPI parameters grouped by their location."""
 
@@ -241,7 +330,7 @@ def format_parameter_lines(parameters: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
-def format_request_body_lines(request_body: Any) -> list[str]:
+def format_request_body_lines(request_body: Any, spec: dict[str, Any] | None = None) -> list[str]:
     """Render a compact OpenAPI request body section."""
 
     if not isinstance(request_body, dict):
@@ -255,12 +344,15 @@ def format_request_body_lines(request_body: Any) -> list[str]:
     for media_type, media_spec in content.items():
         schema = media_spec.get("schema", {}) if isinstance(media_spec, dict) else {}
         lines.append(f"- `{media_type}` `{format_schema_type(schema)}`")
+        schema_lines = format_schema_details(schema, spec)
+        if schema_lines:
+            lines.extend(schema_lines)
     lines.append("")
     return lines
 
 
-def format_response_lines(responses: Any) -> list[str]:
-    """Render OpenAPI responses including headers."""
+def format_response_lines(responses: Any, spec: dict[str, Any] | None = None) -> list[str]:
+    """Render OpenAPI responses including headers and body schemas."""
 
     if not isinstance(responses, dict) or not responses:
         return []
@@ -274,6 +366,19 @@ def format_response_lines(responses: Any) -> list[str]:
         lines.append(f"### {status_code}")
         if description:
             lines.extend([description, ""])
+
+        content = response.get("content")
+        if isinstance(content, dict) and content:
+            lines.extend(["#### Body", ""])
+            for media_type, media_spec in content.items():
+                if not isinstance(media_spec, dict):
+                    continue
+                schema = media_spec.get("schema", {})
+                lines.extend([media_type, "", f"`{media_type}`", ""])
+                schema_lines = format_schema_details(schema, spec)
+                if schema_lines:
+                    lines.extend(schema_lines)
+                    lines.append("")
 
         headers = response.get("headers")
         if isinstance(headers, dict) and headers:
@@ -295,6 +400,7 @@ def render_openapi_operation_markdown(
     path: str,
     method: str,
     operation: dict[str, Any],
+    spec: dict[str, Any] | None = None,
 ) -> str:
     """Render a single OpenAPI operation as readable Markdown."""
 
@@ -311,12 +417,12 @@ def render_openapi_operation_markdown(
     request_sections = []
     if isinstance(parameters, list):
         request_sections.extend(format_parameter_lines(parameters))
-    request_sections.extend(format_request_body_lines(request_body))
+    request_sections.extend(format_request_body_lines(request_body, spec))
     if request_sections:
         lines.extend(["## Request", ""])
         lines.extend(request_sections)
 
-    lines.extend(format_response_lines(responses))
+    lines.extend(format_response_lines(responses, spec))
     return clean_text("\n".join(lines))
 
 
@@ -345,7 +451,12 @@ def render_openapi_spec_markdown(spec: dict[str, Any]) -> str:
                 if not isinstance(operation, dict):
                     continue
                 rendered_operations.append(
-                    render_openapi_operation_markdown(path=path, method=method, operation=operation)
+                    render_openapi_operation_markdown(
+                        path=path,
+                        method=method,
+                        operation=operation,
+                        spec=spec,
+                    )
                 )
 
     if rendered_operations:
@@ -402,7 +513,12 @@ def extract_html_content(html: str, hash_fragment: str) -> tuple[str, str]:
         if resolved:
             path, method, operation = resolved
             return (
-                render_openapi_operation_markdown(path=path, method=method, operation=operation),
+                render_openapi_operation_markdown(
+                    path=path,
+                    method=method,
+                    operation=operation,
+                    spec=spec,
+                ),
                 "Resolved the requested hash route from the embedded OpenAPI spec.",
             )
         if not hash_fragment:
