@@ -67,15 +67,22 @@ export INTRANET_ALLOWED_PREFIXES="http://127.0.0.1:8000/,http://localhost:8000/"
 ## 环境安装
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r mcp/intranet-docs/requirements.txt
+```
+
+如果不想激活虚拟环境，也可以直接显式使用 `.venv` 下的解释器和 `pip`：
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r mcp/intranet-docs/requirements.txt
 ```
 
 ## 启动方式
 
 ```bash
-python mcp/intranet-docs/server.py
+.venv/bin/python mcp/intranet-docs/server.py
 ```
 
 这是一个 STDIO MCP server，启动后会等待 MCP 客户端通过标准输入输出进行通信。
@@ -87,13 +94,13 @@ python mcp/intranet-docs/server.py
 推荐直接让 Inspector 代为拉起本 MCP server：
 
 ```bash
-npx @modelcontextprotocol/inspector python mcp/intranet-docs/server.py
+npx @modelcontextprotocol/inspector .venv/bin/python mcp/intranet-docs/server.py
 ```
 
-如果本地 `python` 不是目标虚拟环境，也可以显式指定解释器：
+如果已经激活虚拟环境，也可以写成：
 
 ```bash
-npx @modelcontextprotocol/inspector .venv/bin/python mcp/intranet-docs/server.py
+npx @modelcontextprotocol/inspector python mcp/intranet-docs/server.py
 ```
 
 默认情况下，Inspector 会启动：
@@ -121,7 +128,7 @@ Connection Error - Did you add the proxy session token in Configuration?
 仅用于本机临时调试时，也可以关闭 Inspector proxy 的鉴权：
 
 ```bash
-DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector python mcp/intranet-docs/server.py
+DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector .venv/bin/python mcp/intranet-docs/server.py
 ```
 
 不建议在不可信网络环境中这样使用。
@@ -167,7 +174,7 @@ DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector python mcp/intran
 
 ```toml
 [mcp_servers.intranetDocs]
-command = "python"
+command = ".venv/bin/python"
 args = ["mcp/intranet-docs/server.py"]
 cwd = "/path/to/agents"
 env = { INTRANET_ALLOWED_PREFIXES = "http://127.0.0.1:8000/,http://localhost:8000/" }
@@ -214,7 +221,7 @@ get
 ## 最小验证清单
 
 1. 在本机启动文档站点，例如 `http://127.0.0.1:8000/`
-2. 启动 MCP server：`python mcp/intranet-docs/server.py`
+2. 启动 MCP server：`.venv/bin/python mcp/intranet-docs/server.py`
 3. 通过 MCP 客户端调用 `fetch_intranet_doc`
 4. 分别验证：
    - 分类页 URL 可返回该页面全部接口文档
