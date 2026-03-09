@@ -15,4 +15,8 @@ args = ["mcp/intranet-docs/server.py"]
 
 # Optional placeholders you may add locally when needed:
 # cwd = "/path/to/your/repo"
-# env = { EXAMPLE_TOKEN = "replace-me" }
+# env = {
+#   INTRANET_ALLOWED_PREFIXES = "http://docs.example.internal:9500/",
+#   INTRANET_DOCS_BASE_URL = "http://docs.example.internal:9500/",
+#   INTRANET_DOCS_HTML_PAGES = "radiovipaccount.html,activityreward.html"
+# }
